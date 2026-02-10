@@ -22,9 +22,11 @@ Data flows through a layered backend with composite indexes for fast queries.
 ## Data Storage
 
 ### Hot Store (Live Tables)
-Latest state snapshot for dashboards:
-- `vehicle_live` – Current energy, SoC, temperature per vehicle
-- `meter_live` – Current voltage, consumption per meter
+Latest full telemetry snapshot for each device:
+
+- `vehicle_live` – Latest vehicle state (SoC, delivered energy, battery temperature, timestamp)
+- `meter_live` – Latest meter state (consumed energy, voltage, timestamp)
+
 
 Upserted on every reading. Used for real-time queries.
 
@@ -47,7 +49,7 @@ CREATE INDEX idx_meter_history_meter_time
   ON meter_history (meter_id, recorded_at DESC);
 ```
 
-Enable fast time-range queries (e.g., last 24 hours) without full table scans.
+By indexing both the device identifier and timestamp, the database can perform efficient range scans for time-window analytics (e.g., last 24 hours) without scanning large history tables.
 
 
 ## API Endpoints
@@ -75,7 +77,7 @@ POST /v1/mappings
 GET /v1/analytics/performance/V1
 ```
 
-Returns last-24-hour efficiency ratio (DC / AC energy).
+Returns last-24-hour efficiency ratio (DC / AC energy) along with Battery Average Temperature.
 
 
 ## Setup
@@ -99,8 +101,7 @@ Reference load:
 10,000 devices @ 1 sample/minute
 ├─ Daily records:    14.4 million rows
 ├─ Monthly growth:   432 million rows
-├─ 12-month storage: 5.18 billion rows
-└─ Live tables:      ~20,000 rows
+
 ```
 
 At ~100,000 devices, needs table partitioning (monthly) and read replicas. Hot-cold separation ensures live queries stay fast as history grows.
